@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オンライン・チャット広場</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            background-color: #3b7a57; /* 芝生の色 */
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        /* アバターのスタイル */
+        .player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #ffcc00;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #333;
+            transform: translate(-50%, -50%);
+            transition: background-color 0.1s;
+        }
+
+        /* 吹き出しのスタイル */
+        .chat-bubble {
+            position: absolute;
+            bottom: 45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            color: black;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .chat-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
+
+        #ui-panel {
+            width: 800px;
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+        }
+
+        #send-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #ffcc00;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+        }
+
+        #send-btn:hover {
+            background-color: #ffdb4d;
+        }
+
+        #instructions {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>☕ まったりチャット広場</h1>
+    
+    <div id="game-container">
+        <!-- プレイヤー要素はJavaScriptで動的に生成されます -->
+    </div>
+
+    <div id="ui-panel">
+        <input type="text" id="chat-input" placeholder="ここに入力してEnterで発言..." maxlength="50">
+        <button id="send-btn" onclick="sendMessage()">発言</button>
+    </div>
+
+    <div id="instructions">
+        移動: <b>W, A, S, D</b> または <b>矢印キー</b> ｜ 発言: <b>Enterキー</b>
+    </div>
+
+    <script>
+        const container = document.getElementById('game-container');
+        const inputField = document.getElementById('chat-input');
+
+        // プレイヤーの初期データ
+        let myPlayer = {
+            id: 'player_' + Math.floor(Math.random() * 1000),
+            name: '名無しさん' + Math.floor(Math.random() * 100),
+            x: 400,
+            y: 250,
+            color: '#' + Math.floor(Math.random()*16777215).toString(16), // ランダムな色
+            element: null,
+            bubbleElement: null
+        };
+
+        // キー入力の状態管理
+        const keys = {};
+
+        // プレイヤーのDOM要素を作成
+        function createPlayerElement(player) {
+            const div = document.createElement('div');
+            div.className = 'player';
+            div.style.backgroundColor = player.color;
+            div.innerText = player.name.charAt(0); // イニシャルを表示
+
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            div.appendChild(bubble);
+
+            container.appendChild(div);
+
+            player.element = div;
+            player.bubbleElement = bubble;
+        }
+
+        createPlayerElement(myPlayer);
+
+        // キーボードイベントの登録
+        window.addEventListener('keydown', (e) => {
+            // チャット入力中に移動キーが暴発しないようにする
+            if (document.activeElement === inputField) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+                return;
+            }
+
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'].includes(e.key)) {
+                keys[e.key] = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // ゲームのメインループ（毎フレームの処理）
+        function update() {
+            const speed = 4;
+
+            // 移動計算
+            if (keys['ArrowUp'] || keys['w']) myPlayer.y -= speed;
+            if (keys['ArrowDown'] || keys['s']) myPlayer.y += speed;
+            if (keys['ArrowLeft'] || keys['a']) myPlayer.x -= speed;
+            if (keys['ArrowRight'] || keys['d']) myPlayer.x += speed;
+
+            // 画面外に出ないように制限
+            const radius = 20;
+            if (myPlayer.x < radius) myPlayer.x = radius;
+            if (myPlayer.x > 800 - radius) myPlayer.x = 800 - radius;
+            if (myPlayer.y < radius) myPlayer.y = radius;
+            if (myPlayer.y > 500 - radius) myPlayer.y = 500 - radius;
+
+            // 画面上の位置を更新
+            myPlayer.element.style.left = myPlayer.x + 'px';
+            myPlayer.element.style.top = myPlayer.y + 'px';
+
+            requestAnimationFrame(update);
+        }
+
+        requestAnimationFrame(update);
+
+        // メッセージ送信処理
+        let bubbleTimeout;
+        function sendMessage() {
+            const text = inputField.value.trim();
+            if (text === '') return;
+
+            // 吹き出しに文字を表示
+            myPlayer.bubbleElement.innerText = text;
+            myPlayer.bubbleElement.style.display = 'block';
+
+            // 入力欄をクリア
+            inputField.value = '';
+            inputField.blur();
+
+            // 4秒後に吹き出しを消す
+            clearTimeout(bubbleTimeout);
+            bubbleTimeout = setTimeout(() => {
+                myPlayer.bubbleElement.style.display = 'none';
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
